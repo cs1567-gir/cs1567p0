@@ -1,3 +1,4 @@
 <launch>
+<include file="$(find kobuki_gazebo)/launch/kobuki_empty_world.launch"/>
 <node name="ConstantCommand" pkg="cs1567p0" type="ConstantCommand.py"/>
 </launch>
