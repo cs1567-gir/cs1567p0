@@ -6,7 +6,6 @@ from geometry_msgs.msg import *
 from cs1567p0.srv import *
 
 odom = None
-run = False
 
 # get current yaw angle from the supplied quaternion
 def get_angle(data):
@@ -34,15 +33,6 @@ def move(x, data):
         command.linear.x = 0.0
         send_command(command)
 
-def keep_printing():
-    global run
-    run = True
-    x = 0
-    while True:
-        print x
-        x += 1
-        rospy.sleep(1)
-
 # performed everytime the kobuki robot gives us pose data
 def odometry_callback(data):
     command = Twist()
@@ -50,9 +40,6 @@ def odometry_callback(data):
     global odom
     odom = data
     move(1.0, data)
-    if not run:
-        keep_printing()
-    print "callback" 
 
 # initialize the ros node and its communications
 def initialize():
