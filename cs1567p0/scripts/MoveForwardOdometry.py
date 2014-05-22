@@ -21,6 +21,9 @@ def get_angle(data):
 # sets linear and angular values to get to desired location (x,y)
 # based on position and orientation information
 def move(x,y):
+	command = Twist()
+    send_command = rospy.ServiceProxy('constant_command', ConstantCommand)
+
 	current_x = odom.data.data.position.x
 	current_y = odom.data.data.position.y
 	# get current rotation
@@ -43,8 +46,9 @@ def move(x,y):
     # this prevents the robot from starting to move if the angle is too far off
 
     # build direction vector from this information
-    current_d = vector(math.cos(current_theta), math.sin(current_theta), 0)
-    # determine unit direction vector to destination
+    # current_d = vector(math.cos(current_theta), math.sin(current_theta), 0)
+    
+    # determine UNIT direction vector to destination (python's vectors have built-in normalization function)
     dest_d = vector(x - current_x, y - current_y, 0).norm
     # (now we have target rotation angle)
     target_theta = 180/math.pi * math.asin(dest_d.y)
@@ -77,6 +81,9 @@ def move(x,y):
 
 # performed everytime the kobuki robot gives us pose data
 def odometry_callback(data):
+	command = Twist()
+    send_command = rospy.ServiceProxy('constant_command', ConstantCommand)
+
     global odom
     global corner
     odom = data
@@ -92,8 +99,9 @@ def odometry_callback(data):
     	corner[3] = move(0.0, 0.0)
     '''
     else:
-        # stop all motion
- 
+        command.linear.x = 0.0
+        command.angular.x = 0.0
+        send_command(command) 
 
 
 def move_square():
