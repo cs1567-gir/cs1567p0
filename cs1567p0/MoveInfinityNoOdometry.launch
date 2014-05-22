@@ -1,0 +1,3 @@
+<launch>
+<node name="MoveInfinityNoOdometry" pkg="cs1567p0" type="MoveInfinityNoOdometry.py"/>
+</launch>
