@@ -28,6 +28,9 @@ def move(x,y):
     current_y = odom.pose.pose.position.y
     # get current rotation
     current_theta = get_angle(odom)
+    if current_theta < 0.0:
+        current_theta += 360.0
+
     distance = math.sqrt((current_x - x)**2 + (current_y - y)**2)
 
     # first, check if we are within an acceptible radius of our desired point
@@ -40,54 +43,55 @@ def move(x,y):
     elif distance < 0.25: # if we are closer than 25 cm, slow down
         command.linear.x = 0.2
     else:
-        command.linear.x = 0.5
+        command.linear.x = 0.4
 
     # NOTE: we do not send the command until we have checked the angle value
     # this prevents the robot from starting to move if the angle is too far off
 
     # build direction vector from this information
-    # current_d = vector(math.cos(current_theta), math.sin(current_theta), 0)
     
-    # determine UNIT direction vector to destination (python's vectors have built-in normalization function)
-    # dest_d = vector(x - current_x, y - current_y, 0).norm
     # (now we have target rotation angle)
-    target_theta = 180/math.pi * math.asin((y - current_y)/math.sqrt((x - current_x)**2 + (y - current_y)**2))
+    target_theta = 180/math.pi * math.asin((y - current_y)/distance)
+    if (x - current_x) < 0.0:
+        target_theta = 180/math.pi * math.acos((x - current_x)/distance)
+        if (y - current_y) < 0.0:
+            target_theta = 360 - target_theta
+
+    if target_theta < 0:
+        print "pre-correction target: ", target_theta
+        target_theta += 360
+        print "post-correction target: ", target_theta
+
+    # target_theta = math.copysign(target_theta, x - current_x)
+
+    # if desired point is in quadrant 2 or 3 as compared to current point, compensate for asin's limitations
+    error = target_theta - current_theta
+    print "error: ", error
+    if error > 180:
+        error -= 360
+    if error < -180:
+        error += 360
+    print "compensated error: ", error 
+    
     # if our angle is off from the target by more than some error value
-    if abs(current_theta - target_theta) > 0.25:
+    if abs(error) > 0.5:
         # if we are really far from the target angle, stop forward motion before correcting
-        if abs(current_theta - target_theta) > 10.0:
+        if abs(error) > 10.0:
             command.linear.x = 0.0
         # set angular velocity to rotate towards destination (scale by how far from desired angle we are)
         # command.angular.z = max((target_theta - current_theta)/180, 0.2)
         print "target_theta: ", target_theta, "current_theta: ", current_theta
-        print "error: ", target_theta - current_theta
-        if(target_theta - current_theta < 0):
+        if(error < 0):
             print "turning clockwise"
-            command.angular.z = min((target_theta - current_theta)/180, -0.3)
+            command.angular.z = min((error)/180, -0.3)
         else:
             print "turning counterclockwise"
-            command.angular.z = max((target_theta - current_theta)/180, 0.3)
+            command.angular.z = max((error)/180, 0.3)
     else:
         command.angular.z = 0.0
 
     send_command(command)
     return False
-'''
-    command = Twist()
-    send_command = rospy.ServiceProxy('constant_command', ConstantCommand)
-    if(odom.pose.pose.position.x > 0.9*x and odom.pose.pose.position.x < x):
-        command.linear.x = 0.2
-        send_command(command)
-    elif(odom.pose.pose.position.x < 0.99*x):
-        command.linear.x = 0.5
-        send_command(command)
-    elif(odom.pose.pose.position.x > 1.05*x):
-        command.linear.x = -0.1
-        send_command(command)
-    else:
-        command.linear.x = 0.0
-        send_command(command)
-'''
 
 # performed everytime the kobuki robot gives us pose data
 def odometry_callback(data):
@@ -113,18 +117,11 @@ def odometry_callback(data):
         send_command(command)
         print "current_theta: ", get_angle(data) 
 
-
-def move_square():
-    move(1,0)
-    move(1,1)
-    move(0,1)
-    move(0,0)
-
 # initialize the ros node and its communications
 def initialize():
     pub = rospy.Publisher('/mobile_base/commands/reset_odometry', Empty, queue_size=10)
     rospy.Subscriber('/odom', Odometry, odometry_callback)
-    rospy.init_node('MoveForwardOdometry', anonymous=True)
+    rospy.init_node('MoveXYOdometry', anonymous=True)
     rospy.wait_for_service('constant_command')
     while pub.get_num_connections() < 1:
         rospy.sleep(0.1)
