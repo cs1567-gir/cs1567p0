@@ -4,9 +4,22 @@ from std_msgs.msg import *
 from nav_msgs.msg import *
 from geometry_msgs.msg import *
 from cs1567p0.srv import *
+from datetime import datetime
+
+class KobukiState:
+    def __init__(self):
+        self.time = datetime.now().microsecond
+        self.x = 0.0
+        self.y = 0.0
+        self.heading = 0.0
+        self.distance = 0.0
+        self.total_distance = 0.0
+        self.velocity = 0.0
 
 odom = None
 corner = [False, False, False, False, False]
+last_state = KobukiState()
+
 
 # get current yaw angle from the supplied quaternion
 def get_angle(data):
@@ -18,115 +31,64 @@ def get_angle(data):
     angle = math.copysign(2*math.acos(w), z)
     return 180.0/math.pi*angle
 
-# calculates and sets linear and angular velocities to make smooth arc
-def move_arc(x,y,radius,sign):
-    command = Twist()
-    send_command = rospy.ServiceProxy('constant_command', ConstantCommand)
-
-    current_x = odom.pose.pose.position.x
-    current_y = odom.pose.pose.position.y
-    x_error = x - current_x
-    y_error = y - current_y
-
-    # get current rotation from our starting orientation
-    current_theta = get_angle(odom)
-    if current_theta < 0.0:
-        current_theta += 360.0
-
-    # current distance to target
-    distance = math.sqrt(x_error**2 + y_error**2)
-
-    # first, check if we are within an acceptible radius of our desired point
-    # this is risky, should probably increase the OK radius
-    if distance < 0.02:   # 2 cm dead zone
-        command.linear.x = 0.0
-        command.angular.x = 0.0
-        send_command(command)
-        return True
-    elif distance < 0.25: # if we are closer than 25 cm, slow down
-        command.linear.x = 0.2
-    else:
-        command.linear.x = 0.4
-
-    # NOTE: we do not send the command until we have checked the angle value
-    # this prevents the robot from starting to move if the angle is too far off
-    
-    # determine target heading
-    target_theta = 180/math.pi * math.asin(y_error/distance)
-    
-    # since asin only handles quadrants 1 and 4, we neet to use acos for others
-    if x_error < 0.0:
-        target_theta = 180/math.pi * math.acos(x_error/distance)
-        if y_error < 0.0: # this still leaves quadrant 3 uncovered, so a manual compensation is necessary
-            target_theta = 360 - target_theta
-
-    theta_offset = target_theta
-    c_over_2r = distance / (2 * radius)
-    print "c: ", distance, " r: ", radius
-    print "c/2r = ", c_over_2r
-    if c_over_2r > 1.0:
-        c_over_2r = 1.0
-    elif c_over_2r < -1.0:
-        c_over_2r = -1.0
-    target_theta = 2 * math.asin(distance/(2 * radius))
-    target_theta = 180/math.pi*target_theta
-    target_theta += theta_offset
-    target_theta += sign * 90
-
-    # now shift target theta to be between 0 and 360
-    if target_theta < 0:
-        target_theta += 360
-    if target_theta >= 360:
-        target_theta -= 360
-
-    # determine the difference between our target heading and our current heading
-    theta_error = target_theta - current_theta
-    print "angle error: ", theta_error
-    if theta_error > 180:
-        theta_error -= 360
-    if theta_error < -180:
-        theta_error += 360
-    print "compensated angle error: ", theta_error
-    #if distance < 1:
-    #    theta_error *= distance 
-    #print "distance compensated angle error: ", theta_error    
-
-    # if our angle is off from the target by more than 0.5 degrees, we begin to compensate
-    if abs(theta_error) > 0.2:
-        # if we are really far from the target angle, stop forward motion and correct
-        if abs(theta_error) > 10.0:
-            command.linear.x = 0.0
-        # set angular velocity to rotate towards destination (scaled by our current error)
-        print "target_theta: ", target_theta, "current_theta: ", current_theta
-        if(theta_error < 0):
-            print "turning clockwise"
-            command.angular.z = min((theta_error)/180, -0.3)
-        else:
-            print "turning counterclockwise"
-            command.angular.z = max((theta_error)/180, 0.3)
-    else:
-        command.angular.z = 0.0
-
-    send_command(command)
-    return False
-
 # performed everytime the kobuki robot gives us pose data
 def odometry_callback(data):
     command = Twist()
     send_command = rospy.ServiceProxy('constant_command', ConstantCommand)
 
+    global last_state
     global odom
     global corner
-    odom = data
-    
-    
-    if not corner[0]:
-        corner[0] = move_arc(2.0, 0.0, 1.0, 1.0)
+
+    c_t = datetime.now().microsecond
+    delta_t = c_t - last_state.time
+    delta_t *= 1000000.0
+    delta_x = data.pose.pose.position.x - last_state.x
+    delta_y = data.pose.pose.position.y - last_state.y
+    heading = get_angle(data)
+    if heading < 0:
+        heading += 360
+    delta_h = heading - last_state.heading
+    distance = math.sqrt(delta_x**2 + delta_y**2)
+    velocity = distance / delta_t # approx speed
+    avg_velocity = 0.7 * velocity + 0.3 * last_state.velocity    
+
+    # update global state
+    last_state.time = c_t
+    last_state.x = data.pose.pose.position.x
+    last_state.y = data.pose.pose.position.y
+    last_state.heading = heading
+    last_state.velocity = avg_velocity
+    last_state.distance = distance
+    #last_state.total_distance += 0.7 * distance + (0.3 * (avg_velocity * delta_t))
+    last_state.total_distance += distance
+  
+    r = 0.5
+    s = last_state.total_distance
+    theta = (s/r)
+    theta = 180/math.pi * theta
+
+    if last_state.total_distance < (math.pi * r * 2):
+        # fix the angle
+        error = theta - heading
+        if error > 180.0:
+            error -= 360.0
+        if error < -180.0:
+            error += 360.0
+
+        if abs(error) > 0.2:
+            if error < 0:
+                command.angular.z = min(error*0.05, -0.3)
+            elif error > 0:
+                command.angular.z = max(error*0.05, 0.3)
+            else:
+                command.angular.z = 0.0
+        command.linear.x = 0.2
     else:
+        command.angular.z = 0.0
         command.linear.x = 0.0
-        command.angular.x = 0.0
-        send_command(command)
-        print "current_theta: ", get_angle(data) 
+    send_command(command)
+    print "total distance: ", last_state.total_distance
 
 # initialize the ros node and its communications
 def initialize():
@@ -142,3 +104,4 @@ def initialize():
 # if this is run as a standalone
 if __name__ == "__main__":
     initialize()
+ 
