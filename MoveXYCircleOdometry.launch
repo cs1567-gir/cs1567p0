@@ -1,0 +1,3 @@
+<launch>
+<node name="MoveXYCircleOdometry" pkg="cs1567p0" type="MoveXYCircleOdometry.py"/>
+</launch>

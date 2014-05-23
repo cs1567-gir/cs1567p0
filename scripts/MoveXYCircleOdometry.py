@@ -72,15 +72,17 @@ def move(x,y):
     if theta_error < -180:
         theta_error += 360
     print "compensated angle error: ", theta_error
-    if distance < 1:
-        theta_error *= distance 
-    print "distance compensated angle error: ", theta_error    
+    #if distance < 0.25:
+    #    theta_error *= 4 * distance 
+    # print "distance compensated angle error: ", theta_error    
 
     # if our angle is off from the target by more than 0.5 degrees, we begin to compensate
-    if abs(theta_error) > 0.5:
+    if abs(theta_error) > 0.2:
         # if we are really far from the target angle, stop forward motion and correct
-        if abs(theta_error) > 10.0:
+        if abs(theta_error) > 21.0:
             command.linear.x = 0.0
+        elif abs(theta_error) > 12.0:
+            command.linear.x = 0.1
         # set angular velocity to rotate towards destination (scaled by our current error)
         print "target_theta: ", target_theta, "current_theta: ", current_theta
         if(theta_error < 0):
@@ -106,9 +108,9 @@ def odometry_callback(data):
     
 
     print "point: ", point
-    if point < 12:
-        done = move(math.cos(point * math.pi / 6) - 1.0, math.sin(point * math.pi / 6))
-    elif point == 12:
+    if point < 20:
+        done = move((math.cos(point * math.pi / 10) - 1.0)*0.75, 0.75*math.sin(point * math.pi / 10))
+    elif point == 20:
         done = move(0.0, 0.0)
     else:
         command.linear.x = 0.0
@@ -116,26 +118,11 @@ def odometry_callback(data):
         send_command(command)
         print "current_theta: ", get_angle(data) 
     
-    '''    
-    if not corner[0]:
-        corner[0] = move(1.0, 0.0)
-    elif not corner[1]:
-        corner[1] = move(1.0, 1.0)
-    elif not corner[2]:
-        corner[2] = move(0.0, 1.0)
-    elif not corner[3]:
-    	corner[3] = move(0.0, 0.0)
-    else:
-        command.linear.x = 0.0
-        command.angular.x = 0.0
-        send_command(command)
-        print "current_theta: ", get_angle(data) 
-    '''
 # initialize the ros node and its communications
 def initialize():
     pub = rospy.Publisher('/mobile_base/commands/reset_odometry', Empty, queue_size=10)
     rospy.Subscriber('/odom', Odometry, odometry_callback)
-    rospy.init_node('MoveXYOdometry', anonymous=True)
+    rospy.init_node('MoveXYCircleOdometry', anonymous=True)
     rospy.wait_for_service('constant_command')
     while pub.get_num_connections() < 1:
         rospy.sleep(0.1)
