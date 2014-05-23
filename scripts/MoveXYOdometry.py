@@ -26,6 +26,8 @@ def move(x,y):
 
     current_x = odom.pose.pose.position.x
     current_y = odom.pose.pose.position.y
+    x_error = x - current_x
+    y_error = y - current_y
 
     # get current rotation from our starting orientation
     current_theta = get_angle(odom)
@@ -33,7 +35,7 @@ def move(x,y):
         current_theta += 360.0
 
     # current distance to target
-    distance = math.sqrt((current_x - x)**2 + (current_y - y)**2)
+    distance = math.sqrt(x_error**2 + y_error**2)
 
     # first, check if we are within an acceptible radius of our desired point
     # this is risky, should probably increase the OK radius
@@ -51,12 +53,12 @@ def move(x,y):
     # this prevents the robot from starting to move if the angle is too far off
 
     # determine target heading
-    target_theta = 180/math.pi * math.asin((y - current_y)/distance)
+    target_theta = 180/math.pi * math.asin(y_error/distance)
     
     # since asin only handles quadrants 1 and 4, we neet to use acos for others
-    if (x - current_x) < 0.0:
-        target_theta = 180/math.pi * math.acos((x - current_x)/distance)
-        if (y - current_y) < 0.0: # this still leaves quadrant 3 uncovered, so a manual compensation is necessary
+    if x_error < 0.0:
+        target_theta = 180/math.pi * math.acos(x_error/distance)
+        if y_error < 0.0: # this still leaves quadrant 3 uncovered, so a manual compensation is necessary
             target_theta = 360 - target_theta
 
     # now shift target theta to be between 0 and 360
@@ -66,27 +68,27 @@ def move(x,y):
         print "post-correction target: ", target_theta
 
     # determine the difference between our target heading and our current heading
-    error = target_theta - current_theta
-    print "error: ", error
-    if error > 180:
-        error -= 360
-    if error < -180:
-        error += 360
-    print "compensated error: ", error 
+    theta_error = target_theta - current_theta
+    print "angle error: ", theta_error
+    if theta_error > 180:
+        theta_error -= 360
+    if theta_error < -180:
+        theta_error += 360
+    print "compensated angle error: ", theta_error 
     
     # if our angle is off from the target by more than 0.5 degrees, we begin to compensate
-    if abs(error) > 0.5:
+    if abs(theta_error) > 0.5:
         # if we are really far from the target angle, stop forward motion and correct
-        if abs(error) > 6.0:
+        if abs(theta_error) > 6.0:
             command.linear.x = 0.0
         # set angular velocity to rotate towards destination (scaled by our current error)
         print "target_theta: ", target_theta, "current_theta: ", current_theta
-        if(error < 0):
+        if(theta_error < 0):
             print "turning clockwise"
-            command.angular.z = min((error)/180, -0.3)
+            command.angular.z = min((theta_error)/180, -0.3)
         else:
             print "turning counterclockwise"
-            command.angular.z = max((error)/180, 0.3)
+            command.angular.z = max((theta_error)/180, 0.3)
     else:
         command.angular.z = 0.0
 
