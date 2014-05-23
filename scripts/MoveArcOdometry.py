@@ -18,9 +18,8 @@ def get_angle(data):
     angle = math.copysign(2*math.acos(w), z)
     return 180.0/math.pi*angle
 
-# sets linear and angular values to get to desired location (x,y)
-# based on position and orientation information
-def move(x,y):
+# calculates and sets linear and angular velocities to make smooth arc
+def move_arc(x,y,radius,sign):
     command = Twist()
     send_command = rospy.ServiceProxy('constant_command', ConstantCommand)
 
@@ -61,11 +60,15 @@ def move(x,y):
         if y_error < 0.0: # this still leaves quadrant 3 uncovered, so a manual compensation is necessary
             target_theta = 360 - target_theta
 
+    target_theta = target_theta + (180/(distance*radius))
+
     # now shift target theta to be between 0 and 360
     if target_theta < 0:
         print "pre-correction target: ", target_theta
         target_theta += 360
         print "post-correction target: ", target_theta
+    if target_theta >= 360:
+        target_theta -= 360
 
     # determine the difference between our target heading and our current heading
     theta_error = target_theta - current_theta
@@ -109,41 +112,18 @@ def odometry_callback(data):
     
     
     if not corner[0]:
-        corner[0] = move(1.0, 0.6)
-    elif not corner[1]:
-        corner[1] = move(-0.2, 0.6)
-    elif not corner[2]:
-        corner[2] = move(0.8, 0.0)
-    elif not corner[3]:
-    	corner[3] = move(0.4, 1.0)
-    elif not corner[4]:
-    	corner[4] = move(0.0, 0.0)
+        corner[0] = move_arc(2.0, 1.0, 1.0, -1.0)
     else:
         command.linear.x = 0.0
         command.angular.x = 0.0
         send_command(command)
         print "current_theta: ", get_angle(data) 
-    
-    '''    
-    if not corner[0]:
-        corner[0] = move(1.0, 0.0)
-    elif not corner[1]:
-        corner[1] = move(1.0, 1.0)
-    elif not corner[2]:
-        corner[2] = move(0.0, 1.0)
-    elif not corner[3]:
-    	corner[3] = move(0.0, 0.0)
-    else:
-        command.linear.x = 0.0
-        command.angular.x = 0.0
-        send_command(command)
-        print "current_theta: ", get_angle(data) 
-    '''
+
 # initialize the ros node and its communications
 def initialize():
     pub = rospy.Publisher('/mobile_base/commands/reset_odometry', Empty, queue_size=10)
     rospy.Subscriber('/odom', Odometry, odometry_callback)
-    rospy.init_node('MoveXYOdometry', anonymous=True)
+    rospy.init_node('MoveArcOdometry', anonymous=True)
     rospy.wait_for_service('constant_command')
     while pub.get_num_connections() < 1:
         rospy.sleep(0.1)
