@@ -68,7 +68,7 @@ def odometry_callback(data):
     theta = (s/r)
     theta = 180/math.pi * theta
 
-    if last_state.total_distance < (math.pi * r * 2):
+    if last_state.total_distance < 0.99 * (math.pi * r * 2):
         # fix the angle
         error = theta - heading
         if error > 180.0:
@@ -84,7 +84,7 @@ def odometry_callback(data):
             else:
                 command.angular.z = 0.0
         command.linear.x = 0.2
-    elif last_state.total_distance < (math.pi * r * 4):
+    elif last_state.total_distance < 0.995 * (math.pi * r * 4):
         theta = -theta
         if theta < 0:
             theta += 360.0
