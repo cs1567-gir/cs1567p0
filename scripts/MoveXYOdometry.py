@@ -88,10 +88,10 @@ def move(x,y):
         print "target_theta: ", target_theta, "current_theta: ", current_theta
         if(theta_error < 0):
             print "turning clockwise"
-            command.angular.z = min((theta_error)/180, -0.3)
+            command.angular.z = min((theta_error)*0.01, -0.3)
         else:
             print "turning counterclockwise"
-            command.angular.z = max((theta_error)/180, 0.3)
+            command.angular.z = max((theta_error)*0.01, 0.3)
     else:
         command.angular.z = 0.0
 

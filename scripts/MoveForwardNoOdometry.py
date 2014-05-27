@@ -10,11 +10,9 @@ def move_forward():
     
     try:
         send_command = rospy.ServiceProxy('constant_command', ConstantCommand)
-        #command.linear.x = 0.2
         command.linear.x = 0.5
         response = send_command(command)
-        #rospy.sleep(6.0)
-        rospy.sleep(2.5)
+        rospy.sleep(2.41)
         command.linear.x = 0.0
         response = send_command(command)
         print response

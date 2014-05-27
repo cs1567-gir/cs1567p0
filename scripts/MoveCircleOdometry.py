@@ -16,8 +16,6 @@ class KobukiState:
         self.total_distance = 0.0
         self.velocity = 0.0
 
-odom = None
-corner = [False, False, False, False, False]
 last_state = KobukiState()
 
 
@@ -37,8 +35,6 @@ def odometry_callback(data):
     send_command = rospy.ServiceProxy('constant_command', ConstantCommand)
 
     global last_state
-    global odom
-    global corner
 
     c_t = datetime.now().microsecond
     delta_t = c_t - last_state.time
@@ -51,16 +47,15 @@ def odometry_callback(data):
     delta_h = heading - last_state.heading
     distance = math.sqrt(delta_x**2 + delta_y**2)
     velocity = distance / delta_t # approx speed
-    avg_velocity = 0.7 * velocity + 0.3 * last_state.velocity    
+    avg_velocity = 0.7 * velocity + 0.3 * last_state.velocity # currently unused   
 
     # update global state
     last_state.time = c_t
     last_state.x = data.pose.pose.position.x
     last_state.y = data.pose.pose.position.y
     last_state.heading = heading
-    last_state.velocity = avg_velocity
+    last_state.velocity = avg_velocity # currently unused
     last_state.distance = distance
-    #last_state.total_distance += 0.7 * distance + (0.3 * (avg_velocity * delta_t))
     last_state.total_distance += distance
   
     r = 0.5
@@ -68,7 +63,7 @@ def odometry_callback(data):
     theta = (s/r)
     theta = 180/math.pi * theta
 
-    if last_state.total_distance < (math.pi * r * 2):
+    if last_state.total_distance < 0.99 * (math.pi * r * 2):
         # fix the angle
         error = theta - heading
         if error > 180.0:
@@ -78,9 +73,9 @@ def odometry_callback(data):
 
         if abs(error) > 0.2:
             if error < 0:
-                command.angular.z = min(error*0.05, -0.3)
+                command.angular.z = min(error*0.1, -0.3)
             elif error > 0:
-                command.angular.z = max(error*0.05, 0.3)
+                command.angular.z = max(error*0.1, 0.3)
             else:
                 command.angular.z = 0.0
         command.linear.x = 0.2

@@ -8,9 +8,10 @@ def move_circle():
     rospy.wait_for_service('constant_command')
     command = Twist()
     
-    omega = 0.8
-    velocity = 0.5
-    drive_time = 9.2
+    omega = 0.6
+    velocity = 0.3
+    # 10.47 calculated
+    drive_time = 11.7
 
     try:
         send_command = rospy.ServiceProxy('constant_command', ConstantCommand)
