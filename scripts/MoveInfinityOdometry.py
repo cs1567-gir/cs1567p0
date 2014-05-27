@@ -84,6 +84,24 @@ def odometry_callback(data):
             else:
                 command.angular.z = 0.0
         command.linear.x = 0.2
+    elif last_state.total_distance < (math.pi * r * 4):
+        theta = -theta
+        if theta < 0:
+            theta += 360.0
+        error = theta - heading
+        if error > 180.0:
+            error -= 360.0
+        if error < -180.0:
+            error += 360.0
+
+        if abs(error) > 0.2:
+            if error < 0:
+                command.angular.z = min(error*0.05, -0.3)
+            elif error > 0:
+                command.angular.z = max(error*0.05, 0.3)
+            else:
+                command.angular.z = 0.0
+        command.linear.x = 0.2        
     else:
         command.angular.z = 0.0
         command.linear.x = 0.0
@@ -94,7 +112,7 @@ def odometry_callback(data):
 def initialize():
     pub = rospy.Publisher('/mobile_base/commands/reset_odometry', Empty, queue_size=10)
     rospy.Subscriber('/odom', Odometry, odometry_callback)
-    rospy.init_node('MoveCircleOdometry', anonymous=True)
+    rospy.init_node('MoveInfinityOdometry', anonymous=True)
     rospy.wait_for_service('constant_command')
     while pub.get_num_connections() < 1:
         rospy.sleep(0.1)
