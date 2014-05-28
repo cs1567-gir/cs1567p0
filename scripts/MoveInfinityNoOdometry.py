@@ -10,7 +10,7 @@ def move_circle():
     
     omega = 0.6
     velocity = 0.3
-    drive_time = 11.7
+    drive_time = 11.9
 
     try:
         send_command = rospy.ServiceProxy('constant_command', ConstantCommand)
@@ -27,7 +27,7 @@ def move_circle():
         command.linear.x = velocity
         command.angular.z = -omega
         response = send_command(command)
-        rospy.sleep(drive_time)
+        rospy.sleep(drive_time + 0.2)
 
         command.linear.x = 0.0
         command.angular.z = 0.0
